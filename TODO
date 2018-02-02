@@ -9,6 +9,28 @@
     docker run  -v $XSOCK:$XSOCK -v $XAUTH:$XAUTH -e XAUTHORITY=$XAUTH  -e DISPLAY=$DISPLAY --rm -it rocker/x11 R -e "capabilities()"
 
 
+
+_____________________________________________________________
+[ Files of interest ]
+
+/etc/odbcinst.ini
+/etc/odbc.ini
+/etc/rstudio/rserver.conf
+/etc/rstudio/rsession.conf
+
+/etc/Rserv.conf
+
+
+_____________________________________________________________
+[ PATH ]
+
+
+
+
+
+
+_____________________________________________________________
+[ xterm colors ]
 BLACK=$(tput setaf 0)
 RED=$(tput setaf 1)
 GREEN=$(tput setaf 2)
@@ -22,3 +44,26 @@ NORMAL=$(tput sgr0)
 BLINK=$(tput blink)
 REVERSE=$(tput smso)
 UNDERLINE=$(tput smul)
+
+_____________________________________________________________
+[ /etc/Rserv.conf ]
+
+workdir /tmp/Rserve
+pwdfile /opt/isv/R-base/contrib/etc/Rserve.passwd
+remote enable
+auth disable
+plaintext disable
+fileio enable
+interactive yes
+# socket /tmp/Rserve/Rserve.sock
+port 6311
+maxinbuf 262144
+maxsendbuf 262144
+source /opt/isv/R-base/contrib/etc/R.env.R
+# chroot /tmp/Rserve
+sockmod 0
+encoding utf8
+su now
+uid 33672
+gid 3652
+umask 022

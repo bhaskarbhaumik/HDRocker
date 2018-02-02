@@ -22,117 +22,30 @@ COPY    resources /tmp/hdrocker/resources
 # Set working directory
 WORKDIR /tmp/hdrocker/resources
 
-# Expose standard ports (3838 for Shiny server and 8787 for R Studio)
-EXPOSE  3838 8787
+# Expose standard ports (3838 for Shiny server, 6311 for Rserve and 8787 for R Studio)
+EXPOSE  3838 6311 8787
 
 # Update CentOS base packages and install some additional but required packages
-RUN     yum -y update
-RUN     yum -y install  epel-release tar psmisc bash-completion gcc gcc-c++ gcc-gfortran make ccache file git git-extras git-tools \
-                        openssh openssh-clients openssl openssl-devel libxml2-devel rsync zip unzip \
-                        udunits2-devel proj-devel libX11-devel geos-devel mesa-libOSMesa-devel libpng-devel mesa-libGLU-devel \
-                        freetype-devel gdal-devel proj-epsg unixODBC-devel which sudo ksh \
-                        python mysql-connector-java mysql-connector-odbc mysql-connector-python mysql-utilities
-# Install some additional fonts that can be used in R plots
-RUN     yum -y install  abattis-cantarell-fonts adobe-source-code-pro-fonts dejavu-fonts-common dejavu-sans-fonts dejavu-sans-fonts \
-                        dejavu-sans-mono-fonts dejavu-serif-fonts fontawesome-fonts ghostscript-fonts gnu-free-fonts-common \
-                        gnu-free-mono-fonts gnu-free-sans-fonts gnu-free-serif-fonts lato-fonts open-sans-fonts \
-                        roboto-fontface-common roboto-fontface-fonts xorg-x11-font-utils xorg-x11-server-utils 'xorg-x11-fonts*'
-# Install MS Core TrueType fonts
-RUN     date && id && pwd && find . -ls
-RUN     [ -f msttcore-fonts-installer-2.6-1.noarch.rpm ] && yum -y --nogpgcheck localinstall msttcore-fonts-installer-2.6-1.noarch.rpm
+RUN     /bin/bash -c ./install-syspkgs.sh
 
-# Install Oracle JDK 1.8.151
-RUN     [ -f jdk-8u151-linux-x64.rpm ] || curl -sLOk -b "oraclelicense=accept-dbindex-cookie" "http://download.oracle.com/otn-pub/java/jdk/8u151-b12/e758a0de34e24606bca991d704f6dcbf/jdk-8u151-linux-x64.rpm"
-RUN     yum -y --nogpgcheck localinstall jdk-8u151-linux-x64.rpm
+# Install various R packages
+RUN     /bin/bash -c ./install-rpkgs.sh
 
-# Install Microsoft R Open (MRO)
-RUN     [ -f microsoft-r-open-3.4.2.tar.gz ] || curl -sLOk "https://mran.blob.core.windows.net/install/mro/3.4.2/microsoft-r-open-3.4.2.tar.gz"
-RUN     tar xvfpz microsoft-r-open-3.4.2.tar.gz
-RUN     if grep -qi GenuineIntel /proc/cpuinfo; then microsoft-r-open/install.sh -au; else microsoft-r-open/install.sh -u; fi
-RUN     echo /opt/microsoft/ropen/3.4.2/lib64/R/lib >/etc/ld.so.conf.d/microsoft-r-open-3.4.2-x86_64.conf
+# Setup unix user and groups and user relates configs
+RUN     /bin/bash -c ./config-usergrps.sh
 
-# Install R Studio
-RUN     [ -f rstudio-server-rhel-1.1.383-x86_64.rpm ] || curl -sLOk "https://download2.rstudio.org/rstudio-server-rhel-1.1.383-x86_64.rpm"
-RUN     yum -y --nogpgcheck localinstall rstudio-server-rhel-1.1.383-x86_64.rpm
-
-# Install Shiny Server
-RUN     [ -f shiny-server-1.5.6.875-rh5-x86_64.rpm ] || curl -sLOk "https://download3.rstudio.org/centos5.9/x86_64/shiny-server-1.5.6.875-rh5-x86_64.rpm"
-RUN     yum -y --nogpgcheck localinstall shiny-server-1.5.6.875-rh5-x86_64.rpm
-
-# Install ODBC drivers for connectivity
-# Install Microsoft ODBC drivers for Microsoft SQL Server
-RUN     curl -sLk "https://packages.microsoft.com/config/rhel/7/prod.repo" -o /etc/yum.repos.d/mssql-release.repo
-RUN     ACCEPT_EULA=Y yum -y --nogpgcheck install msodbcsql mssql-tools
-# Install Teradata Tools and Utilities (TTU)
-RUN     [ -f TeradataToolsAndUtilitiesBase__linux_indep.16.10.05.00.tar.gz ] && tar xvfpz TeradataToolsAndUtilitiesBase__linux_indep.16.10.05.00.tar.gz
-RUN     [ -e TeradataToolsAndUtilitiesBase/setup.bat ] && chmod +x TeradataToolsAndUtilitiesBase/setup.bat
-RUN     [ -e TeradataToolsAndUtilitiesBase/.setup.sh ] && chmod +x TeradataToolsAndUtilitiesBase/.setup.sh
-RUN     TeradataToolsAndUtilitiesBase/.setup.sh w -installdir=/opt
-RUN     [ -f TeradataToolsAndUtilitiesBase/ttulistproducts_unix.sh ] && chmod +x TeradataToolsAndUtilitiesBase/ttulistproducts_unix.sh && ./TeradataToolsAndUtilitiesBase/ttulistproducts_unix.sh
-RUN     echo /opt/teradata/client/16.10/lib64 >/etc/ld.so.conf.d/teradata-client-16.10-x86_64.conf
-# Install Simba Google BigQuery ODBC drivers
-RUN     [ -f SimbaODBCDriverforGoogleBigQuery64-2.1.6.1006.tar.gz ] && tar -xvpz -f SimbaODBCDriverforGoogleBigQuery64-2.1.6.1006.tar.gz --no-same-owner --owner root --group root -C /opt
-RUN     echo /opt/simba/googlebigqueryodbc/lib/64 >/etc/ld.so.conf.d/simba-googlebigquery-2.1.6-x86_64.conf
-# Install Google CloudSQL proxy client
-RUN     curl -sLk "https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64" -o /usr/local/bin/cloud_sql_proxy && chmod +x /usr/local/bin/cloud_sql_proxy
-# Install Oracle ODBC drivers and tools
-RUN     [ -f oracle-instantclient12.2-basic-12.2.0.1.0-1.x86_64.rpm ] && yum -y --nogpgcheck localinstall oracle-instantclient12.2-basic-12.2.0.1.0-1.x86_64.rpm
-RUN     [ -f oracle-instantclient12.2-jdbc-12.2.0.1.0-1.x86_64.rpm ] && yum -y --nogpgcheck localinstall oracle-instantclient12.2-jdbc-12.2.0.1.0-1.x86_64.rpm
-RUN     [ -f oracle-instantclient12.2-odbc-12.2.0.1.0-2.x86_64.rpm ] && yum -y --nogpgcheck localinstall oracle-instantclient12.2-odbc-12.2.0.1.0-2.x86_64.rpm
-RUN     [ -f oracle-instantclient12.2-sqlplus-12.2.0.1.0-1.x86_64.rpm ] && yum -y --nogpgcheck localinstall oracle-instantclient12.2-sqlplus-12.2.0.1.0-1.x86_64.rpm
-RUN     [ -f oracle-instantclient12.2-tools-12.2.0.1.0-1.x86_64.rpm ] && yum -y --nogpgcheck localinstall oracle-instantclient12.2-tools-12.2.0.1.0-1.x86_64.rpm
-RUN     echo /usr/lib/oracle/12.2/client64/lib >/etc/ld.so.conf.d/oracle-instantclient12.2-x86_64.conf
-
-# Install THD R base filesystem dirs and files
-RUN     [ -f hd-r-filesystem.tar.gz ] && tar -xvpz -f hd-r-filesystem.tar.gz --no-same-owner --owner root --group root -C /opt
-
-# Install all JDBC drivers [IBM DB2, Microsoft SQL Server, MySQL, Oracle, SAP HANA, Teradata]
-RUN     [ -f jdbc-drivers.tar.gz ] && tar -xvpz -f jdbc-drivers.tar.gz --no-same-owner --owner root --group root -C /opt/hd/r/contrib/jdbc/lib
-
-# Rebuild library cache
-RUN     ldconfig
-
-# Add Linux groups radmin & rusers
-RUN     groupadd radmin
-RUN     groupadd rusers
-
-# Add Linux users radmin & ruser
-RUN     useradd -c "R Administrator" -d /home/radmin -g radmin -m -p '$6$H4vLqDpp$yFhLdPdYstcNW9tkyofxCH1xyS.08AUkTrBoRfMO5OqjJv6Yig4LyldQaOUR/Cf5zkAnu4ep/l91.tPCyl6dR.' -s /bin/bash radmin
-RUN     useradd -c "R User" -d /home/ruser -g rusers -G users,rusers -m -p '$6$H4vLqDpp$yFhLdPdYstcNW9tkyofxCH1xyS.08AUkTrBoRfMO5OqjJv6Yig4LyldQaOUR/Cf5zkAnu4ep/l91.tPCyl6dR.' -s /bin/bash ruser
-# Reset root password
-RUN     usermod -p '$6$H4vLqDpp$yFhLdPdYstcNW9tkyofxCH1xyS.08AUkTrBoRfMO5OqjJv6Yig4LyldQaOUR/Cf5zkAnu4ep/l91.tPCyl6dR.' root
-
-# Give root access to radmin through sudo
-RUN     echo "%radmin	ALL=(ALL)	NOPASSWD: ALL" >>/etc/sudoers
-
-# Start daemons under radmin
+# Start RStudio server process with user radmin
 USER    radmin:radmin
-#RUN     .... commands to start daemons
-#RUN    /usr/lib/rstudio-server/bin/rserver --server-daemonize 0
+RUN     /bin/bash -c ./start-rstudio.sh
+
+# Start RStudio process with user rserv
+USER    rserv:rserv
+RUN     /bin/bash -c ./start-rserv.sh
+
+# Start Shiny server process with user shiny
+USER    radmin:radmin
+RUN     /bin/bash -c ./start-shiny.sh
 
 # Start shell/R under ruser
 USER    ruser:rusers
 CMD ["/bin/bash"]
-
-##
-# install.packages(c('shiny', 'devtools', 'tidyverse', 'dplyr', 'formatR', 'remotes', 'caTools', 'bookdown', 'rticles', 'rmdshower'), repos='https://cran.rstudio.com/')
-# install.packages('udunits2', repos='https://cran.rstudio.com/', configure.args='--with-udunits2-lib=/usr/lib64 --with-udunits2-include=/usr/include/udunits2')
-# install.packages(c('RColorBrewer', 'RandomFields', 'classInt', 'deldir', 'gstat', 'lidR', 'mapdata', 'maptools', 'mapview', 'proj4', 'raster', 'rgdal', 'rgeos', 'rlas', 'sf', 'sp', 'spacetime', 'spatstat', 'spdep', 'geoR', 'geosphere'), repos='https://cran.rstudio.com/')
-# install.packages('PKI', repos='http://rforge.net')
-# install.packages('rgl', repos='https://cran.rstudio.com/', clean = FALSE, keep_outputs = TRUE)
-#
-#
-# echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bash_profile
-# echo 'export PATH="$PATH:/opt/mssql-tools/bin"' >> ~/.bashrc
-#
-#
-# SIMBAGOOGLEBIGQUERYODBCINI=/etc/simba.googlebigqueryodbc.ini
-# ORACLE_HOME=/usr/lib/oracle/12.2/client64
-# TNS_ADMIN=$ORACLE_HOME/network/admin/tnsnames.ora
-# NLS_LANG=en_US.UTF-8
-#
-# 4/nksxyP-V8EThgW3RSPqKGLW1WLLY5kSEi8Y60f6AqmA
-#
-# Dilip Kurup
-# Pricing BA
-# COM support
